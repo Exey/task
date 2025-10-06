@@ -19,18 +19,37 @@
 >>- Базы данных и хранение документов.
 >>- API-шлюз / коммуникация между сервисами.
 
-```mermaid
+>>Коротко объяснить, как решите проблему разных фронтов (Web, TG, VK).
 
+### С помощью паттерна BFF 🟡
+
+## Архитектура системы (цвета по слоям)
+
+- **🔵 Клиенты** — Web, Telegram Mini App, VK Mini App  
+- **🟡 BFF (API Gateway)** — единая точка входа, маршрутизация, JWT-валидация, rate limiting  
+- **🟢 Микросервисы** — слабосвязанные, stateless, общаются через REST (синхронно) и Message Broker (асинхронно)  
+  - `auth-svc` — OAuth 2.0 + OIDC с внешними провайдерами → выдача JWT  
+  - `user-profile-svc` — управление профилем, ролями и прогрессом пользователя
+  - `ocr-svc` — приём файлов, публикация задач в очередь, фоновый OCR  
+  - `matching-svc` — подбор пар пользователей (истец/ответчик) по правилам и событиям
+  - `game-svc` — игра симуляция судебных процессов для обучения и лидогенерации
+  - `robot-judge-svc` —  AI-ассистент для анализа кейсов, оценки перспектив дела и генерации рекомендаций
+- **🔴 Хранилище**  
+  - **PostgreSQL** — единый кластер, изолированные схемы на сервис (пользователи, документы, мэтчи)  
+  - **S3 / MinIO** — бинарные файлы (сканы, PDF)  
+  - **Message Broker** (RabbitMQ / Redis) — асинхронные задачи  
+
+```mermaid
 graph TD
     classDef frontend stroke:#007bff,stroke-width:3px;
     classDef gateway stroke:#ffc107,stroke-width:3px;
     classDef service stroke:#28a745,stroke-width:3px;
     classDef data stroke:#dc3545,stroke-width:3px;
-    classDef external stroke:#6c757d,stroke-width:3px,stroke-dasharray: 5 5;
-    classDef future stroke:#17a2b8,stroke-width:3px,stroke-dasharray: 5 5;
-    %% Пользователи и фронтенды
+    classDef future stroke:#28a745,stroke-width:3px,stroke-dasharray: 5 5;
+
+    %% Пользователи и фронты
     User[Пользователь]
-    subgraph Frontends [Клиентские приложения]
+    subgraph Frontends [Слой Клиентские приложения]
         direction LR
         TG[Telegram Mini App]
         VK[VK Mini App]
@@ -41,8 +60,7 @@ graph TD
     User --> Web
 
     %% API-шлюз
-    API_GW[API-шлюз / BFF]
-
+    API_GW[BFF / API-шлюз всех фронтов]
     TG -->|HTTPS / REST| API_GW
     VK -->|HTTPS / REST| API_GW
     Web -->|HTTPS / REST| API_GW
@@ -50,63 +68,98 @@ graph TD
     class API_GW gateway;
 
     %% Микросервисы
-    subgraph Backend["Микросервисы на FastAPI"]
+    subgraph Backend["Слой Микросервисы на FastAPI"]
         direction TB
-        Auth_SVC[Сервис Авторизации]
-        User_SVC[Сервис Профилей Пользователей]
-        Game_SVC[Игра-симулятор]
-        Matching_SVC[Сервис Мэтчинга]
-        Document_SVC[Модуль Документов]
-        RobotJudge_SVC[Робот-судья с ИИ]
+        Auth_SVC[Сервис Авторизации<br>auth-svc]
+        UserProfile_SVC[Сервис Профилей Пользователей<br>user-profile-svс]
+        Game_SVC[Сервис Игра-симулятор<br>game-svc]
+        Matching_SVC[Сервис Мэтчинга<br>matching-svc]
+        OCR_SVC[Сервис Документов<br>ocr-svc]
+        RobotJudge_SVC[Сервис ИИ-Робот-судья<br>robot-judge-svc]
     end
-    class Auth_SVC,User_SVC,Game_SVC,Matching_SVC,Document_SVC service;
+    class Auth_SVC,UserProfile_SVC,Game_SVC,Matching_SVC,OCR_SVC service;
     class RobotJudge_SVC future;
 
     API_GW --> Auth_SVC
-    API_GW --> User_SVC
+    API_GW --> UserProfile_SVC
     API_GW --> Game_SVC
     API_GW --> Matching_SVC
-    API_GW --> Document_SVC
+    API_GW --> OCR_SVC
     API_GW -.-> RobotJudge_SVC
 
     %% Взаимодействие между сервисами
-    Auth_SVC -.->|JWT-токены| User_SVC
-    Document_SVC -->|Асинхронные задачи| Matching_SVC
+    Auth_SVC -.->|JWT-токены| UserProfile_SVC
+    OCR_SVC -->|Асинхронные задачи| Matching_SVC
 
-    %% Инфраструктура и данные
-    subgraph Data_Storage [Хранилище данных]
+    %% Хранилище данных
+    subgraph Data_Storage [Слой Хранилище данных]
         PostgreSQL[(PostgreSQL)]
-        S3[(Object Storage<br/>S3 / MinIO)]
-        MessageBroker[<br>Message Broker<br/>RabbitMQ / Redis]
+        S3[(S3 / MinIO)]
+        MessageBroker[Message Broker<br>RabbitMQ / Redis]
     end
     class PostgreSQL,S3,MessageBroker data;
 
-    User_SVC --> PostgreSQL
+    UserProfile_SVC --> PostgreSQL
     Game_SVC --> PostgreSQL
     Matching_SVC --> PostgreSQL
-    Document_SVC --> PostgreSQL
-    Document_SVC --> S3
-    Document_SVC --> MessageBroker
-
-    %% Внешние интеграции
-    subgraph External_APIs [Внешние сервисы]
-        ESIA[ЕСИА API]
-        Socials[API Соцсетей]
-        Rafinad[Rafinad.AI API]
-        FNS[ФНС API]
-    end
-    class ESIA,Socials,Rafinad,FNS external;
-
-    Auth_SVC -->|OAuth 2.0 / OpenID Connect| ESIA
-    Auth_SVC -->|OAuth 2.0| Socials
-    Document_SVC -->|HTTPS / gRPC| Rafinad
-    Document_SVC -->|SOAP / REST| FNS
+    OCR_SVC --> PostgreSQL
+    OCR_SVC --> S3
+    OCR_SVC --> MessageBroker
 ```
 
->>Коротко объяснить, как решите проблему разных фронтов (Web, TG, VK).
+## Авторизация
 
+Клиент → **🟡 BFF** → **🟢 auth-svc** → (OAuth) → JWT → клиент.  
 
+Все последующие запросы несут JWT → **🟡 BFF** валидирует → проксирует в нужный **🟢 микросервис** с `user_id`.
 
+## Хранение
+
+- Структурированные данные → **🔴 PostgreSQL**  
+- Файлы → **🔴 S3 / MinIO**  
+- Фоновые задачи → **🔴 Message Broker (Redis/Rabbit)**
+
+```mermaid
+graph TD
+    classDef service stroke:#28a745,stroke-width:3px;
+    classDef data stroke:#dc3545,stroke-width:3px;
+    classDef mock stroke:#f8f9fa,stroke:#adb5bd,stroke-width:2px,stroke-dasharray: 4 4;
+
+    %% БД
+    DB[(Единая PostgreSQL<br/>БД: пользователи,<br/>документы, метаданные)]
+
+    %% Авторизация 
+    Auth_SVC[Сервис Авторизации]
+    Mock_ESIA[Mock-ЕСИА заглушка]
+    Mock_Socials[Mock-Соцсети заглушка]
+
+    Auth_SVC -->|OAuth 2.0 + OIDC| Mock_ESIA
+    Auth_SVC -->|OAuth 2.0| Mock_Socials
+    Mock_ESIA -->|user_id| Auth_SVC
+    Mock_Socials -->|user_id| Auth_SVC
+    Auth_SVC -->|Чтение/запись| DB
+
+    %% Документы
+    Document_SVC[Сервис Документов]
+    S3_Storage[(S3 / MinIO)]
+    MsgBroker[(Message Broker)]
+
+    Document_SVC -->|Метаданные| DB
+    Document_SVC -->|Файлы| S3_Storage
+    Document_SVC -->|Публикация задачи| MsgBroker
+
+    Worker[Сервис OCR + AI Worker]
+    Mock_Rafinad[Mock-Rafinad.AI заглушка]
+
+    MsgBroker -->|Потребление задачи| Worker
+    Worker -->|Результат| Mock_Rafinad
+    Mock_Rafinad -->|Ответ| Worker
+    Worker -->|Обновление статуса| DB
+
+    class Auth_SVC,Document_SVC,Worker service;
+    class DB,S3_Storage,MsgBroker data;
+    class Mock_ESIA,Mock_Socials,Mock_Rafinad mock;
+```
 
 >Задание 2. План запуска MVP
 >Дано:
@@ -117,3 +170,12 @@ graph TD
 >>Кратко предложить, как их минимизировать (например: использовать
 >>заглушки для API, начать с одной платформы, применить готовый OCR).
 >
+
+## Ключевые риски 
+1. Внешние API: ЕСИА можно только банкам, в исключения очень непросто попасть (Мой опыт в Солар тому подтверждение)
+   - Банк партнер необходим 
+2. Сервис доков будет очень долго делаться (много корнер кейсов)
+   - Да нужно брать готовый OCR
+3. Можно словить бан от VK
+   - Начать с WEB онли и TG канала
+   - Второй итерацией делаем бот TG
