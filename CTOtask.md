@@ -22,12 +22,12 @@
 ```mermaid
 
 graph TD
-    classDef frontend fill:#e6f3ff,stroke:#007bff,stroke-width:2px;
-    classDef gateway fill:#fff3cd,stroke:#ffc107,stroke-width:2px;
-    classDef service fill:#d4edda,stroke:#28a745,stroke-width:2px;
-    classDef data fill:#f8d7da,stroke:#dc3545,stroke-width:2px;
-    classDef external fill:#e2e3e5,stroke:#6c757d,stroke-width:2px,stroke-dasharray: 5 5;
-    classDef future fill:#d1ecf1,stroke:#17a2b8,stroke-width:2px,stroke-dasharray: 5 5;
+    classDef frontend stroke:#007bff,stroke-width:3px;
+    classDef gateway stroke:#ffc107,stroke-width:3px;
+    classDef service stroke:#28a745,stroke-width:3px;
+    classDef data stroke:#dc3545,stroke-width:3px;
+    classDef external stroke:#6c757d,stroke-width:3px,stroke-dasharray: 5 5;
+    classDef future stroke:#17a2b8,stroke-width:3px,stroke-dasharray: 5 5;
     %% Пользователи и фронтенды
     User[Пользователь]
     subgraph Frontends [Клиентские приложения]
