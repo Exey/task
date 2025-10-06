@@ -19,6 +19,8 @@
 >>- Базы данных и хранение документов.
 >>- API-шлюз / коммуникация между сервисами.
 
+```mermaid
+
 graph TD
     classDef frontend fill:#e6f3ff,stroke:#007bff,stroke-width:2px;
     classDef gateway fill:#fff3cd,stroke:#ffc107,stroke-width:2px;
@@ -26,7 +28,6 @@ graph TD
     classDef data fill:#f8d7da,stroke:#dc3545,stroke-width:2px;
     classDef external fill:#e2e3e5,stroke:#6c757d,stroke-width:2px,stroke-dasharray: 5 5;
     classDef future fill:#d1ecf1,stroke:#17a2b8,stroke-width:2px,stroke-dasharray: 5 5;
-
     %% Пользователи и фронтенды
     User[Пользователь]
     subgraph Frontends [Клиентские приложения]
@@ -100,7 +101,7 @@ graph TD
     Auth_SVC -->|OAuth 2.0| Socials
     Document_SVC -->|HTTPS / gRPC| Rafinad
     Document_SVC -->|SOAP / REST| FNS
-
+```
 
 >>Коротко объяснить, как решите проблему разных фронтов (Web, TG, VK).
 
